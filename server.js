@@ -1,7 +1,10 @@
 const express=require('express');
 const app=express()
-require('./swagger')(app);
+const cors=require('cors')
+//require('./swagger')(app);
+app.use(cors())
 app.use(express.json())//middleware
+// app.use(cors)
 const mongoose=require('mongoose')
 const {Standard}=require('./model')
 //mongoose.connect("mongodb://localhost:27017").then((e)=>console.log("mongodb connected ")).catch((e)=>console.log("unable to connect"))
@@ -85,7 +88,26 @@ try {
     res.status(400).json({ error: error.message });
   }
 });
-   
+app.delete('/deletesubcontrols/:subcontrolId', async (req, res) => {
+  const { subcontrolId } = req.params;
+
+  try {
+    // Find the subcontrol by its ID and remove it from the database
+    const result = await Standard.updateOne(
+      { 'controls.subcontrols._id': subcontrolId },
+      { $pull: { 'controls.$[].subcontrols': { _id: subcontrolId } } }
+    );
+
+    if (result.nModified > 0) {
+      res.json({ message: 'Subcontrol deleted successfully' });
+    } else {
+      res.status(404).json({ message: 'Subcontrol not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+    console.error(error);
+  }
+});
 /**
  * @swagger
  * /getAllProducts:
@@ -101,7 +123,7 @@ app.get('/getAllProducts',async(req,res)=>
 {
     try
     {
-    const p=await Product.find({})
+    const p=await Standard.find({})
     res.send(p);
     }
     catch(e)
@@ -130,63 +152,69 @@ app.get('/getAllProducts',async(req,res)=>
  *       '404':
  *         description: Element not found
  */
-app.get('/getProductById/:id',async (req,res)=>
-{
-    try
-    {
-        const {id}=req.params;
-    const pro=await Product.findById(id);
-    res.send(pro);
+app.get('/getControlsByStandard/:standard', async (req, res) => {
+  try {
+    const { standard } = req.params;
+
+    // Use Mongoose .find() to fetch records based on 'standard'
+    const records = await Standard.find({ standard });
+
+    if (records.length === 0) {
+      return res.status(404).json({ message: 'No records found for the specified standard' });
     }
-    catch(e)
-    {
-        res.send(e);
-        console.log(e);
+
+    res.json(records);
+  } catch (e) {
+    res.status(500).json({ message: 'Internal server error' });
+    console.log(e);
+  }
+});
+app.put('/updateByStandard/:standard', async (req, res) => {
+  try {
+    const { standard } = req.params;
+    const updatedData = req.body; // Updated data
+
+    // Update the data that matches the 'standard'
+    const result = await Standard.updateMany({ standard }, updatedData);
+
+    if (result.nModified === 0) {
+      return res.status(404).json({ message: 'No documents found for the specified standard' });
     }
-})
-/**
- * @swagger
- * /updateProduct/{id}:
- *   put:
- *     summary: Create a new Product
- *     tags:
- *       - Products
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         description: ID of the product to retrieve
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Product'
- *     responses:
- *       '201':
- *         description: Created
- *       '400':
- *         description: Bad Request
- */
-app.put('/updateProduct/:id',async (req,res)=>{
-    try
-    {
-        const {id}=req.params;
-     const pr=await Product.findByIdAndUpdate(id,req.body);
-//   if(!pr)
-//   res.send("cannot find the product with given id")
-     //res.send(req.body);
-     const updpr=await Product.findById(id);
-res.send(updpr);
+
+    res.json({ message: 'Data updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+    console.error(error);
+  }
+});
+// Import required libraries and setup your app
+
+app.put('/updateSubcontrol/:subcontrolId', async (req, res) => {
+  try {
+    const { subcontrolId } = req.params;
+    const updatedSubcontrolData = req.body; // Updated subcontrol data
+
+    // Find the subcontrol by ID and update it
+    const result = await Standard.updateOne(
+      { 'controls.subcontrols._id': subcontrolId },
+      { $set: { 'controls.$[].subcontrols.$[elem]': updatedSubcontrolData } },
+      {
+        arrayFilters: [{ 'elem._id': subcontrolId }],
+      }
+    );
+
+    if (result.nModified === 0) {
+      return res.status(404).json({ message: 'No subcontrols found for the specified ID' });
     }
-    catch(e)
-    {
-        res.send(e);
-        console.log(e);
-    }
-})
+
+    res.json({ message: 'Subcontrol updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+    console.error(error);
+  }
+});
+
+
 /**
  * @swagger
  * /deleteproduct/{id}:
