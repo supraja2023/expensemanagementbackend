@@ -1,36 +1,60 @@
-const express=require('express');
-const app=express()
+const express =  require('express');
+const app = express()
 const cors=require('cors')
-//require('./swagger')(app);
+const bodyParser=require('body-parser')
 app.use(cors())
 app.use(express.json())//middleware
-// app.use(cors)
+app.use(bodyParser.urlencoded({extended:true}))
+app.use(bodyParser.json({extended:true}))
+const DB_URI="mongodb+srv://gvss2017:$Supra5ja@rhym.wiibmyw.mongodb.net/"
 const mongoose=require('mongoose')
 const {Standard}=require('./model')
-//mongoose.connect("mongodb://localhost:27017").then((e)=>console.log("mongodb connected ")).catch((e)=>console.log("unable to connect"))
-app.listen(3000,()=>console.log("server is running"))
+const PORT=process.env.PORT||3000;
+app.listen(PORT,()=>console.log(`server is running on ${PORT}`))
 app.get('/',(req,res)=>res.send("welcome to india"))
-mongoose.connect("mongodb://127.0.0.1:27017/inotebook").then((e)=>console.log("mongodb connected ")).catch((e)=>console.log(e))
+mongoose.connect(DB_URI).then((e)=>console.log("mongodb connected ")).catch((e)=>console.log(e))
 
-/**
- * @swagger
- * /addProduct:
- *   post:
- *     summary: Create a new Product
- *     tags:
- *       - Products
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/Product'
- *     responses:
- *       '201':
- *         description: Created
- *       '400':
- *         description: Bad Request
- */
+// login page code
+const UserSchema = new mongoose.Schema({
+  email: String,
+  password: String,
+})
+const User = mongoose.model('User', UserSchema);
+
+
+
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+app.post('/register', async (req, res) => {
+  const { email, password } = req.body;
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const user = new User({ email, password: hashedPassword });
+  await user.save();
+  res.send({ message: 'Registered successfully' });
+});
+
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  const user = await User.findOne({ email });
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    return res.status(400).send({ error: 'Invalid email or password' });
+  }
+  const token = jwt.sign({ userId: user.id }, 'SECRET_KEY', { expiresIn: '1h' });
+  res.send({ token });
+});
+
+
+
+
+
+
+
+
+
+// table data content 
+
+
 app.post('/addProduct',async (req,res)=>{
 try {
     const { standard, controls } = req.body;
@@ -88,21 +112,30 @@ try {
     res.status(400).json({ error: error.message });
   }
 });
-app.delete('/deletesubcontrols/:subcontrolId', async (req, res) => {
-  const { subcontrolId } = req.params;
-
+app.delete('/deleteSubcontrol/:subcontrolId', async (req, res) => {
   try {
-    // Find the subcontrol by its ID and remove it from the database
-    const result = await Standard.updateOne(
-      { 'controls.subcontrols._id': subcontrolId },
-      { $pull: { 'controls.$[].subcontrols': { _id: subcontrolId } } }
-    );
+    const { subcontrolId } = req.params;
 
-    if (result.nModified > 0) {
-      res.json({ message: 'Subcontrol deleted successfully' });
-    } else {
-      res.status(404).json({ message: 'Subcontrol not found' });
+    // Find the standard and control containing the subcontrol to delete
+    const standard = await Standard.findOne({ 'controls.subcontrols._id': subcontrolId });
+    if (!standard) {
+      return res.status(404).json({ message: 'No subcontrols found for the specified ID' });
     }
+
+    const control = standard.controls.find((c) => c.subcontrols.some((sc) => sc._id == subcontrolId));
+
+  
+    if (!control) {
+      return res.status(404).json({ message: 'No subcontrols found for the specified ID' });
+    }
+
+    // Remove the subcontrol with the specified ID
+    control.subcontrols = control.subcontrols.filter((subcontrol) => subcontrol._id != subcontrolId);
+    
+    // Save the updated standard
+    await standard.save();
+
+    res.json({ message: 'Subcontrol deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
     console.error(error);
@@ -235,20 +268,8 @@ app.put('/updateSubcontrol/:subcontrolId', async (req, res) => {
  *       '404':
  *         description: Element not found
  */
-app.delete('/deleteProduct/:id',async (req,res)=>
-{
-try
-{
-const {id}=req.params;
-const p=await Product.findByIdAndDelete(id);
-res.send(p);
-}
-catch(e)
-{
-    console.log(e);
 
-}
-})
+
 app.get('/standards', async (req, res) => {
   try {
     const standards = await Standard.find({}, 'standard'); // Retrieve all standards and only select the 'standard' field
