@@ -9,7 +9,7 @@ app.use(bodyParser.json({extended:true}))
 const DB_URI="mongodb+srv://gvss2017:$Supra5ja@rhym.wiibmyw.mongodb.net/"
 const mongoose=require('mongoose')
 const {Standard}=require('./model')
-const PORT=process.env.PORT||3000;
+const PORT=process.env.PORT||8000;
 app.listen(PORT,()=>console.log(`server is running on ${PORT}`))
 app.get('/',(req,res)=>res.send("welcome to india"))
 mongoose.connect(DB_URI).then((e)=>console.log("mongodb connected ")).catch((e)=>console.log(e))
