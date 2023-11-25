@@ -5,7 +5,7 @@ const subcontrolSchema = new mongoose.Schema({
   refno: {
     type: String,
     required: true,
-    unique:true
+    
   },
   rational: {
     type: String,
