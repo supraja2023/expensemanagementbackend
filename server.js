@@ -80,7 +80,13 @@ const File = mongoose.model('File', fileSchema);
     {
       type: String,
       default: 'unsaved'
+    },
+    reason:
+    {
+      type: String,
+      default: ''
     }
+    
  
   
   });
@@ -131,6 +137,55 @@ const File = mongoose.model('File', fileSchema);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   });
+  
+app.get('/getSubmittedExpenses', async (req, res) => {
+  try {
+    const submittedExpenses = await Expense.find({ status: 'submitted for approval' });
+    res.status(200).json(submittedExpenses);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+app.put('/updateStatus', async (req, res) => {
+  try {
+    const { expenseUpdates } = req.body;
+
+    // Iterate through each expense update
+    for (const update of expenseUpdates) {
+      const { expenseId, action, reason } = update;
+
+      // Validate that the action is either 'approve' or 'reject'
+      if (action !== 'approve' && action !== 'reject') {
+        return res.status(400).json({ error: 'Invalid action' });
+      }
+
+      // Determine the status based on the action
+      const status = action === 'approve' ? 'approved' : 'rejected';
+
+      // Create an object to update
+      const updateObj = { $set: { status } };
+
+      // If action is 'reject', add the reason to the update object
+      if (action === 'reject') {
+        updateObj.$set.reason = reason;
+      }
+
+      // Update the status of the individual expense
+      await Expense.updateOne({ _id: expenseId }, updateObj);
+    }
+
+    res.status(200).json({ message: 'Expenses updated successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
+
+
+
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
