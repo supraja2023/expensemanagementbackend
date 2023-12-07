@@ -27,7 +27,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Define schema for files
 const fileSchema = new mongoose.Schema({
   filePath: String,
 });
